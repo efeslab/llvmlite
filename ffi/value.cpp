@@ -92,6 +92,20 @@ struct OperandsIterator {
 struct OpaqueOperandsIterator;
 typedef OpaqueOperandsIterator* LLVMOperandsIteratorRef;
 
+/* iangneal: An iterator around a struct's elements, including the stop condition */
+struct ElementsIterator {
+    typedef llvm::StructType::element_iterator const_iterator;
+    const_iterator cur;
+    const_iterator end;
+
+    ElementsIterator(const_iterator cur, const_iterator end)
+        :cur(cur), end(end)
+    { }
+};
+
+struct OpaqueElementsIterator;
+typedef OpaqueElementsIterator* LLVMElementsIteratorRef;
+
 namespace llvm {
 
 static LLVMAttributeListIteratorRef
@@ -154,6 +168,15 @@ unwrap(LLVMOperandsIteratorRef GI){
     return reinterpret_cast<OperandsIterator *>(GI);
 }
 
+static LLVMElementsIteratorRef
+wrap(ElementsIterator* GI){
+    return reinterpret_cast<LLVMElementsIteratorRef>(GI);
+}
+
+static ElementsIterator*
+unwrap(LLVMElementsIteratorRef GI){
+    return reinterpret_cast<ElementsIterator *>(GI);
+}
 
 }
 
@@ -247,6 +270,19 @@ LLVMPY_InstructionOperandsIter(LLVMValueRef I)
                                 inst->op_end()));
 }
 
+API_EXPORT(LLVMElementsIteratorRef)
+LLVMPY_ElementsIter(LLVMTypeRef T)
+{
+    using namespace llvm;
+    Type* ty = unwrap<Type>(T);
+    StructType *st = dyn_cast<StructType>(ty);
+    if (st) {
+        return wrap(new ElementsIterator(st->element_begin(),
+                                         st->element_end()));
+    }
+    return nullptr;
+}
+
 API_EXPORT(const char *)
 LLVMPY_AttributeListIterNext(LLVMAttributeListIteratorRef GI)
 {
@@ -319,6 +355,18 @@ LLVMPY_OperandsIterNext(LLVMOperandsIteratorRef GI)
     }
 }
 
+API_EXPORT(LLVMTypeRef)
+LLVMPY_ElementsIterNext(LLVMElementsIteratorRef STI)
+{
+    using namespace llvm;
+    ElementsIterator* iter = unwrap(STI);
+    if (iter->cur != iter->end) {
+      return wrap(const_cast<Type*>(*(&*iter->cur++)));
+    } else {
+      return NULL;
+    }
+}
+
 API_EXPORT(void)
 LLVMPY_DisposeAttributeListIter(LLVMAttributeListIteratorRef GI)
 {
@@ -351,6 +399,12 @@ LLVMPY_DisposeInstructionsIter(LLVMInstructionsIteratorRef GI)
 
 API_EXPORT(void)
 LLVMPY_DisposeOperandsIter(LLVMOperandsIteratorRef GI)
+{
+    delete llvm::unwrap(GI);
+}
+
+API_EXPORT(void)
+LLVMPY_DisposeElementsIter(LLVMElementsIteratorRef GI)
 {
     delete llvm::unwrap(GI);
 }
@@ -424,6 +478,28 @@ LLVMPY_GetElementType(LLVMTypeRef type)
     }
     return nullptr;
 }
+
+// iangneal: struct type stuff
+
+API_EXPORT(bool)
+LLVMPY_TypeIsStruct(LLVMTypeRef type)
+{
+    return llvm::unwrap(type)->isStructTy();
+}
+
+API_EXPORT(unsigned)
+LLVMPY_GetNumElements(LLVMTypeRef type)
+{
+    llvm::Type* unwrapped = llvm::unwrap(type);
+    llvm::StructType* ty = llvm::dyn_cast<llvm::StructType>(unwrapped);
+    if (ty != nullptr) {
+        return ty->getNumElements();
+    }
+    return 0;
+}
+
+
+// -- end struct additions
 
 API_EXPORT(void)
 LLVMPY_SetLinkage(LLVMValueRef Val, int Linkage)

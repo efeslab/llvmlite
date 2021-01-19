@@ -56,7 +56,7 @@ class TypeRef(ffi.ObjectRef):
     @property
     def is_pointer(self):
         """
-        Returns true is the type is a pointer type.
+        Returns true if the type is a pointer type.
         """
         return ffi.lib.LLVMPY_TypeIsPointer(self)
 
@@ -69,6 +69,35 @@ class TypeRef(ffi.ObjectRef):
         if not self.is_pointer:
             raise ValueError("Type {} is not a pointer".format(self))
         return TypeRef(ffi.lib.LLVMPY_GetElementType(self))
+
+    # iangneal: added in value.cpp
+    @property
+    def is_struct(self):
+        """
+        Returns true if the type is a struct type.
+        """
+        return ffi.lib.LLVMPY_TypeIsStruct(self)
+
+    @property
+    def num_elements(self):
+        """
+        If this is a struct type, return the number of elements. Else, raise
+        an exception.
+        """
+        if not self.is_struct:
+            raise ValueError(f"Type {self} is not a struct")
+        return ffi.lib.LLVMPY_GetNumElements(self)
+
+    @property
+    def elements(self):
+        """
+        Return an iterator over this struct's elements.
+        The iterator will yield a TypeRef for each element.
+        """
+        if not self.is_struct:
+            raise ValueError(f'expected struct type, got {self}')
+        it = ffi.lib.LLVMPY_ElementsIter(self)
+        return _TypeIterator(it)
 
     def __str__(self):
         return ffi.ret_string(ffi.lib.LLVMPY_PrintType(self))
@@ -325,6 +354,27 @@ class _ValueIterator(ffi.ObjectRef):
     def __iter__(self):
         return self
 
+class _TypeIterator(ffi.ObjectRef):
+
+    # iangneal: Fun times
+    def __next__(self):
+        tp = self._next()
+        if tp:
+            return TypeRef(tp)
+        else:
+            raise StopIteration
+
+    next = __next__
+
+    def __iter__(self):
+        return self
+
+    def _dispose(self):
+        self._capi.LLVMPY_DisposeElementsIter(self)
+
+    def _next(self):
+        return ffi.lib.LLVMPY_ElementsIterNext(self)
+
 
 class _AttributeIterator(ffi.ObjectRef):
 
@@ -402,7 +452,6 @@ class _OperandsIterator(_ValueIterator):
     def _next(self):
         return ffi.lib.LLVMPY_OperandsIterNext(self)
 
-
 # FFI
 
 ffi.lib.LLVMPY_PrintValueToString.argtypes = [
@@ -431,6 +480,14 @@ ffi.lib.LLVMPY_TypeIsPointer.restype = c_bool
 ffi.lib.LLVMPY_GetElementType.argtypes = [ffi.LLVMTypeRef]
 ffi.lib.LLVMPY_GetElementType.restype = ffi.LLVMTypeRef
 
+# iangneal: struct stuff
+ffi.lib.LLVMPY_GetNumElements.argtypes = [ffi.LLVMTypeRef]
+ffi.lib.LLVMPY_GetNumElements.restype = c_uint
+
+ffi.lib.LLVMPY_TypeIsStruct.argtypes = [ffi.LLVMTypeRef]
+ffi.lib.LLVMPY_TypeIsStruct.restype = c_bool
+
+# -- end
 
 ffi.lib.LLVMPY_GetTypeName.argtypes = [ffi.LLVMTypeRef]
 ffi.lib.LLVMPY_GetTypeName.restype = c_void_p
@@ -516,3 +573,11 @@ ffi.lib.LLVMPY_OperandsIterNext.restype = ffi.LLVMValueRef
 
 ffi.lib.LLVMPY_GetOpcodeName.argtypes = [ffi.LLVMValueRef]
 ffi.lib.LLVMPY_GetOpcodeName.restype = c_void_p
+
+ffi.lib.LLVMPY_DisposeElementsIter.argtypes = [ffi.LLVMElementsIterator]
+
+ffi.lib.LLVMPY_ElementsIter.argtypes = [ffi.LLVMTypeRef]
+ffi.lib.LLVMPY_ElementsIter.restype = ffi.LLVMElementsIterator
+
+ffi.lib.LLVMPY_ElementsIterNext.argtypes = [ffi.LLVMElementsIterator]
+ffi.lib.LLVMPY_ElementsIterNext.restype = ffi.LLVMTypeRef
