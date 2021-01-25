@@ -6,6 +6,8 @@
 
 // the following is needed for WriteGraph()
 #include "llvm/Analysis/CFGPrinter.h"
+// iangneal: for debug info
+#include "llvm/IR/DebugInfoMetadata.h"
 
 /* An iterator around a attribute list, including the stop condition */
 struct AttributeListIterator {
@@ -498,6 +500,17 @@ LLVMPY_GetNumElements(LLVMTypeRef type)
     return 0;
 }
 
+API_EXPORT(LLVMTypeRef)
+LLVMPY_GetTypeAtIndex(LLVMTypeRef type, unsigned idx)
+{
+    llvm::Type* unwrapped = llvm::unwrap(type);
+    llvm::StructType* ty = llvm::dyn_cast<llvm::StructType>(unwrapped);
+    if (ty != nullptr) {
+        return wrap(ty->getTypeAtIndex(idx));
+    }
+
+    return nullptr;
+}
 
 // -- end struct additions
 
@@ -585,5 +598,55 @@ LLVMPY_GetOpcodeName(LLVMValueRef Val)
     return LLVMPY_CreateString("");
 }
 
+/**
+ * Inspired by similar code in Hippocrates: 
+ * https://github.com/efeslab/hippocrates/blob/e4b1322781eef3dcdb4843401af92ebdcfa8f0bc/src/BugReports.cpp#L189-L224
+ * 
+ * We need file name, function name, and line number. Function name is easy.
+ */
+
+API_EXPORT(const char *)
+LLVMPY_DebugInfoGetFilename(LLVMValueRef Val)
+{   
+    using namespace llvm;
+    // try to convert to an instruction value, works for other derived
+    // types too
+    llvm::Value* unwrapped = llvm::unwrap(Val);
+    llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(unwrapped);
+
+    // Essentially, need to get the line number and file name from the 
+    // instruction debug information.
+    if (!inst->hasMetadata()) return LLVMPY_CreateString("");
+    if (!inst->getMetadata("dbg")) return LLVMPY_CreateString("");
+
+    if (DILocation *di = dyn_cast<DILocation>(inst->getMetadata("dbg"))) {
+        llvm::DILocalScope *ls = di->getScope();
+        llvm::DIFile *df = ls->getFile();
+        return LLVMPY_CreateString(df->getFilename().str().c_str());
+    }
+
+    return LLVMPY_CreateString("");
+}
+
+API_EXPORT(int64_t)
+LLVMPY_DebugInfoGetLineNumber(LLVMValueRef Val)
+{
+    using namespace llvm;
+    // try to convert to an instruction value, works for other derived
+    // types too
+    llvm::Value* unwrapped = llvm::unwrap(Val);
+    llvm::Instruction* inst = llvm::dyn_cast<llvm::Instruction>(unwrapped);
+
+    // Essentially, need to get the line number and file name from the 
+    // instruction debug information.
+    if (!inst->hasMetadata()) return -1;
+    if (!inst->getMetadata("dbg")) return -1;
+
+    if (DILocation *di = dyn_cast<DILocation>(inst->getMetadata("dbg"))) {
+        return di->getLine();
+    }
+
+    return -1;
+}
 
 } // end extern "C"

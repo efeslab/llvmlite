@@ -328,6 +328,28 @@ class ValueRef(ffi.ObjectRef):
                              % (self._kind,))
         return ffi.ret_string(ffi.lib.LLVMPY_GetOpcodeName(self))
 
+    # iangneal: dbg info stuff
+    @property
+    def dbg_fn_name(self):
+        '''
+
+        '''
+        if not self.is_instruction:
+            raise ValueError(f'expected instruction value, got {self._kind}')
+        return self.function.name
+    
+    @property
+    def dbg_file_name(self):
+        if not self.is_instruction:
+            raise ValueError(f'expected instruction value, got {self._kind}')
+        return ffi.ret_string(ffi.lib.LLVMPY_DebugInfoGetFilename(self))
+
+    @property
+    def dbg_line_num(self):
+        if not self.is_instruction:
+            raise ValueError(f'expected instruction value, got {self._kind}')
+        return ffi.lib.LLVMPY_DebugInfoGetLineNumber(self)
+
 
 class _ValueIterator(ffi.ObjectRef):
 
@@ -581,3 +603,10 @@ ffi.lib.LLVMPY_ElementsIter.restype = ffi.LLVMElementsIterator
 
 ffi.lib.LLVMPY_ElementsIterNext.argtypes = [ffi.LLVMElementsIterator]
 ffi.lib.LLVMPY_ElementsIterNext.restype = ffi.LLVMTypeRef
+
+# Debug info
+ffi.lib.LLVMPY_DebugInfoGetLineNumber.argtypes = [ffi.LLVMValueRef]
+ffi.lib.LLVMPY_DebugInfoGetLineNumber.restype = c_int
+
+ffi.lib.LLVMPY_DebugInfoGetFilename.argtypes = [ffi.LLVMValueRef]
+ffi.lib.LLVMPY_DebugInfoGetFilename.restype = c_void_p
