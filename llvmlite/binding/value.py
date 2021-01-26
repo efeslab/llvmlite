@@ -163,6 +163,8 @@ class ValueRef(ffi.ObjectRef):
 
     @property
     def is_instruction(self):
+        if self.is_operand:
+            return self.as_instruction is not None
         return self._kind == 'instruction'
 
     @property
@@ -320,6 +322,19 @@ class ValueRef(ffi.ObjectRef):
         parents = self._parents.copy()
         parents.update(instruction=self)
         return _OperandsIterator(it, parents)
+
+    @property
+    def as_instruction(self):
+        '''
+        Return an operand as an instruction, or None if it is not possible.
+        '''
+        if not self.is_operand:
+            raise ValueError(f'expected operand value, got {self._kind}')
+        inst = ffi.lib.LLVMPY_OperandToInstruction(self)
+        # Do a nullptr check
+        if inst:
+            return type(self)(inst, 'instruction', self._parents)
+        return None
 
     @property
     def opcode(self):
@@ -610,3 +625,7 @@ ffi.lib.LLVMPY_DebugInfoGetLineNumber.restype = c_int
 
 ffi.lib.LLVMPY_DebugInfoGetFilename.argtypes = [ffi.LLVMValueRef]
 ffi.lib.LLVMPY_DebugInfoGetFilename.restype = c_void_p
+
+# Casting
+ffi.lib.LLVMPY_OperandToInstruction.argtypes = [ffi.LLVMValueRef]
+ffi.lib.LLVMPY_OperandToInstruction.restype = ffi.LLVMValueRef

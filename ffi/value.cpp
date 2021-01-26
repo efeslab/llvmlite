@@ -649,4 +649,15 @@ LLVMPY_DebugInfoGetLineNumber(LLVMValueRef Val)
     return -1;
 }
 
+// iangneal: for def-use chain stuff
+
+API_EXPORT(LLVMValueRef)
+LLVMPY_OperandToInstruction(LLVMValueRef Val)
+{
+    using namespace llvm;
+    
+    llvm::Value* unwrapped = llvm::unwrap(Val);
+    return wrap(llvm::dyn_cast<llvm::Instruction>(unwrapped));
+}
+
 } // end extern "C"
