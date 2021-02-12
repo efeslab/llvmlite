@@ -94,6 +94,18 @@ struct OperandsIterator {
 struct OpaqueOperandsIterator;
 typedef OpaqueOperandsIterator* LLVMOperandsIteratorRef;
 
+/* iangneal: An iterator around a value's users, including the stop condition */
+struct UseIterator {
+    typedef llvm::Value::const_use_iterator const_iterator;
+    const_iterator cur;
+    const_iterator end;
+
+    UseIterator(const_iterator cur, const_iterator end) : cur(cur), end(end) {}
+};
+
+struct OpaqueUseIterator;
+typedef OpaqueUseIterator* LLVMUseIteratorRef;
+
 /* iangneal: An iterator around a struct's elements, including the stop condition */
 struct ElementsIterator {
     typedef llvm::StructType::element_iterator const_iterator;
@@ -168,6 +180,16 @@ wrap(OperandsIterator* GI){
 static OperandsIterator*
 unwrap(LLVMOperandsIteratorRef GI){
     return reinterpret_cast<OperandsIterator *>(GI);
+}
+
+static LLVMUseIteratorRef
+wrap(UseIterator* GI){
+    return reinterpret_cast<LLVMUseIteratorRef>(GI);
+}
+
+static UseIterator*
+unwrap(LLVMUseIteratorRef GI){
+    return reinterpret_cast<UseIterator *>(GI);
 }
 
 static LLVMElementsIteratorRef
@@ -272,6 +294,15 @@ LLVMPY_InstructionOperandsIter(LLVMValueRef I)
                                 inst->op_end()));
 }
 
+API_EXPORT(LLVMUseIteratorRef)
+LLVMPY_UseIter(LLVMValueRef V)
+{
+    using namespace llvm;
+    Value* val = unwrap<Value>(V);
+    return wrap(new UseIterator(val->use_begin(),
+                                val->use_end()));
+}
+
 API_EXPORT(LLVMElementsIteratorRef)
 LLVMPY_ElementsIter(LLVMTypeRef T)
 {
@@ -357,6 +388,18 @@ LLVMPY_OperandsIterNext(LLVMOperandsIteratorRef GI)
     }
 }
 
+API_EXPORT(LLVMValueRef)
+LLVMPY_UseIterNext(LLVMUseIteratorRef GI)
+{
+    using namespace llvm;
+    UseIterator* iter = unwrap(GI);
+    if (iter->cur != iter->end) {
+      return wrap((&*iter->cur++)->getUser());
+    } else {
+      return NULL;
+    }
+}
+
 API_EXPORT(LLVMTypeRef)
 LLVMPY_ElementsIterNext(LLVMElementsIteratorRef STI)
 {
@@ -401,6 +444,12 @@ LLVMPY_DisposeInstructionsIter(LLVMInstructionsIteratorRef GI)
 
 API_EXPORT(void)
 LLVMPY_DisposeOperandsIter(LLVMOperandsIteratorRef GI)
+{
+    delete llvm::unwrap(GI);
+}
+
+API_EXPORT(void)
+LLVMPY_DisposeUseIter(LLVMUseIteratorRef GI)
 {
     delete llvm::unwrap(GI);
 }
@@ -658,6 +707,27 @@ LLVMPY_OperandToInstruction(LLVMValueRef Val)
     
     llvm::Value* unwrapped = llvm::unwrap(Val);
     return wrap(llvm::dyn_cast<llvm::Instruction>(unwrapped));
+}
+
+// iangneal: for index offsets
+
+API_EXPORT(bool)
+LLVMPY_IsConstant(LLVMValueRef Val)
+{
+    using namespace llvm;
+
+    Value *unwrapped = unwrap(Val);
+    return dyn_cast<Constant>(unwrapped) != nullptr;
+}
+
+API_EXPORT(int64_t)
+LLVMPY_GetConstant(LLVMValueRef Val)
+{
+    using namespace llvm;
+    
+    Value *unwrapped = unwrap(Val);
+    const APInt &C = dyn_cast<Constant>(unwrapped)->getUniqueInteger();
+    return C.getLimitedValue();
 }
 
 } // end extern "C"
