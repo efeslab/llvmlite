@@ -99,6 +99,22 @@ class TypeRef(ffi.ObjectRef):
         it = ffi.lib.LLVMPY_ElementsIter(self)
         return _TypeIterator(it)
 
+    # iangneal: added in value.cpp
+    @property
+    def is_vector(self):
+        """
+        Returns true if the type is a vector type.
+        """
+        return ffi.lib.LLVMPY_TypeIsVector(self)
+
+    @property
+    def scalar_type(self):
+        """
+        Returns the type contained in a vector type, or "this" if it's not a 
+        vector type.
+        """
+        return TypeRef(ffi.lib.LLVMPY_GetScalarType(self))
+
     def __str__(self):
         return ffi.ret_string(ffi.lib.LLVMPY_PrintType(self))
 
@@ -563,6 +579,12 @@ ffi.lib.LLVMPY_GetNumElements.restype = c_uint
 
 ffi.lib.LLVMPY_TypeIsStruct.argtypes = [ffi.LLVMTypeRef]
 ffi.lib.LLVMPY_TypeIsStruct.restype = c_bool
+
+ffi.lib.LLVMPY_TypeIsVector.argtypes = [ffi.LLVMTypeRef]
+ffi.lib.LLVMPY_TypeIsVector.restype = c_bool
+
+ffi.lib.LLVMPY_GetScalarType.argtypes = [ffi.LLVMTypeRef]
+ffi.lib.LLVMPY_GetScalarType.restype = ffi.LLVMTypeRef
 
 # -- end
 

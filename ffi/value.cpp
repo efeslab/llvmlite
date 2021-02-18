@@ -563,6 +563,28 @@ LLVMPY_GetTypeAtIndex(LLVMTypeRef type, unsigned idx)
 
 // -- end struct additions
 
+// iangneal: vector type stuff
+
+API_EXPORT(bool)
+LLVMPY_TypeIsVector(LLVMTypeRef type)
+{
+    llvm::Type* ty = llvm::unwrap(type);
+    return ty->isVectorTy() || ty->isArrayTy();
+}
+
+API_EXPORT(LLVMTypeRef)
+LLVMPY_GetScalarType(LLVMTypeRef type, unsigned idx)
+{
+    using namespace llvm;
+    llvm::Type* ty = llvm::unwrap(type);
+    if (auto *at = dyn_cast<ArrayType>(ty)) {
+        return wrap(at->getElementType());
+    }
+    return wrap(ty->getScalarType());
+}
+
+// -- end struct additions
+
 API_EXPORT(void)
 LLVMPY_SetLinkage(LLVMValueRef Val, int Linkage)
 {
