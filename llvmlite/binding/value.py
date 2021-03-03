@@ -79,6 +79,13 @@ class TypeRef(ffi.ObjectRef):
         return ffi.lib.LLVMPY_TypeIsStruct(self)
 
     @property
+    def is_scalar(self):
+        """
+        Return true if this is a primative type.
+        """
+        return not self.is_struct and not self.is_pointer and not self.is_vector
+
+    @property
     def num_elements(self):
         """
         If this is a struct type, return the number of elements. Else, raise
